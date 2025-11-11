@@ -1,0 +1,32 @@
+version: 0.0
+os: linux
+
+files:
+  - source: /
+    destination: /opt/pulse
+
+hooks:
+  BeforeInstall:
+    - location: scripts/before_install.sh
+      timeout: 180
+      runas: ec2-user
+
+  AfterInstall:
+    - location: scripts/install_dependencies.sh
+      timeout: 600
+      runas: ec2-user
+
+  ApplicationStart:
+    - location: scripts/start_app.sh
+      timeout: 300
+      runas: ec2-user
+
+  ApplicationStop:
+    - location: scripts/stop_app.sh
+      timeout: 120
+      runas: ec2-user
+
+  ValidateService:
+    - location: scripts/validate_service.sh
+      timeout: 120
+      runas: ec2-user
