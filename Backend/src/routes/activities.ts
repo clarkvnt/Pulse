@@ -12,74 +12,49 @@ router.use(authenticate);
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const projectId = req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
-    const taskId = req.query.taskId as string | undefined;
+    const taskId = req.query.taskId ? (req.query.taskId as string) : undefined;
     const userId = req.query.userId ? parseInt(req.query.userId as string, 10) : undefined;
-    const type = req.query.type as string | undefined;
+    const type = req.query.type ? (req.query.type as string) : undefined;
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
 
+    const where: any = {};
+    if (projectId) where.projectId = projectId;
+    if (taskId) where.taskId = taskId;
+    if (userId) where.userId = userId;
+    if (type) where.type = type;
+
     const activities = await prisma.activity.findMany({
-      where: {
-        ...(projectId && { projectId }),
-        ...(taskId && { taskId }),
-        ...(userId && { userId }),
-        ...(type && { type }),
-      },
+      where,
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            initials: true,
-            avatar: true,
-          },
+          select: { id: true, name: true, email: true, initials: true, avatar: true },
         },
         project: {
-          select: {
-            id: true,
-            name: true,
-          },
+          select: { id: true, name: true },
         },
         task: {
-          select: {
-            id: true,
-            title: true,
-          },
+          select: { id: true, title: true },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
     });
 
-    // Get total count for pagination
-    const totalCount = await prisma.activity.count({
-      where: {
-        ...(projectId && { projectId }),
-        ...(taskId && { taskId }),
-        ...(userId && { userId }),
-        ...(type && { type }),
-      },
-    });
+    const totalCount = await prisma.activity.count({ where });
 
-    sendSuccess(
-      res,
-      {
-        activities,
-        pagination: {
-          total: totalCount,
-          limit,
-          offset,
-          hasMore: offset + limit < totalCount,
-        },
+    sendSuccess(res, {
+      activities,
+      pagination: {
+        total: totalCount,
+        limit,
+        offset,
+        hasMore: offset + limit < totalCount,
       },
-      'Activities retrieved successfully'
-    );
-  } catch (error) {
-    throw error;
+    }, 'Activities retrieved successfully');
+  } catch (error: any) {
+    sendError(res, error.message || 'Failed to fetch activities', 500);
   }
 });
 
@@ -87,47 +62,22 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const activityId = parseInt(req.params.id, 10);
-
-    if (isNaN(activityId)) {
-      return sendError(res, 'Invalid activity ID', 400);
-    }
+    if (isNaN(activityId)) return sendError(res, 'Invalid activity ID', 400);
 
     const activity = await prisma.activity.findUnique({
       where: { id: activityId },
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            initials: true,
-            avatar: true,
-          },
-        },
-        project: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-          },
-        },
-        task: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-          },
-        },
+        user: { select: { id: true, name: true, email: true, initials: true, avatar: true } },
+        project: { select: { id: true, name: true, description: true } },
+        task: { select: { id: true, title: true, description: true } },
       },
     });
 
-    if (!activity) {
-      return sendError(res, 'Activity not found', 404);
-    }
+    if (!activity) return sendError(res, 'Activity not found', 404);
 
     sendSuccess(res, activity, 'Activity retrieved successfully');
-  } catch (error) {
-    throw error;
+  } catch (error: any) {
+    sendError(res, error.message || 'Failed to fetch activity', 500);
   }
 });
 
@@ -135,63 +85,35 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.get('/project/:projectId', async (req: AuthRequest, res: Response) => {
   try {
     const projectId = parseInt(req.params.projectId, 10);
-
-    if (isNaN(projectId)) {
-      return sendError(res, 'Invalid project ID', 400);
-    }
+    if (isNaN(projectId)) return sendError(res, 'Invalid project ID', 400);
 
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
 
     const activities = await prisma.activity.findMany({
-      where: {
-        projectId,
-      },
+      where: { projectId },
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            initials: true,
-            avatar: true,
-          },
-        },
-        task: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
+        user: { select: { id: true, name: true, email: true, initials: true, avatar: true } },
+        task: { select: { id: true, title: true } },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
     });
 
-    const totalCount = await prisma.activity.count({
-      where: {
-        projectId,
-      },
-    });
+    const totalCount = await prisma.activity.count({ where: { projectId } });
 
-    sendSuccess(
-      res,
-      {
-        activities,
-        pagination: {
-          total: totalCount,
-          limit,
-          offset,
-          hasMore: offset + limit < totalCount,
-        },
+    sendSuccess(res, {
+      activities,
+      pagination: {
+        total: totalCount,
+        limit,
+        offset,
+        hasMore: offset + limit < totalCount,
       },
-      'Project activities retrieved successfully'
-    );
-  } catch (error) {
-    throw error;
+    }, 'Project activities retrieved successfully');
+  } catch (error: any) {
+    sendError(res, error.message || 'Failed to fetch project activities', 500);
   }
 });
 
@@ -202,39 +124,18 @@ router.get('/recent/feed', async (req: AuthRequest, res: Response) => {
 
     const activities = await prisma.activity.findMany({
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            initials: true,
-            avatar: true,
-          },
-        },
-        project: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        task: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
+        user: { select: { id: true, name: true, email: true, initials: true, avatar: true } },
+        project: { select: { id: true, name: true } },
+        task: { select: { id: true, title: true } },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
       take: limit,
     });
 
     sendSuccess(res, activities, 'Recent activities retrieved successfully');
-  } catch (error) {
-    throw error;
+  } catch (error: any) {
+    sendError(res, error.message || 'Failed to fetch recent activities', 500);
   }
 });
 
 export default router;
-

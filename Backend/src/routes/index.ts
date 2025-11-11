@@ -13,7 +13,7 @@ import activityRoutes from './activities.js';
 const router = Router();
 
 // Health check endpoint (for load balancers)
-router.get('/health', (req: Request, res: Response) => {
+router.get('/health', (_req: Request, res: Response) => {
   res.json({
     success: true,
     message: 'Pulse API is running',
@@ -22,29 +22,30 @@ router.get('/health', (req: Request, res: Response) => {
 });
 
 // Readiness check (includes database connectivity)
-router.get('/health/ready', async (req: Request, res: Response) => {
+router.get('/health/ready', async (_req: Request, res: Response) => {
   try {
     // Check database connectivity
     await prisma.$queryRaw`SELECT 1`;
-    
+
     res.json({
       success: true,
       message: 'Service is ready',
       database: 'connected',
       timestamp: new Date().toISOString(),
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(503).json({
       success: false,
       message: 'Service is not ready',
       database: 'disconnected',
       timestamp: new Date().toISOString(),
+      error: error.message,
     });
   }
 });
 
 // Liveness check (basic check)
-router.get('/health/live', (req: Request, res: Response) => {
+router.get('/health/live', (_req: Request, res: Response) => {
   res.json({
     success: true,
     message: 'Service is alive',

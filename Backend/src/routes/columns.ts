@@ -38,45 +38,23 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const projectId = req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
 
     const columns = await prisma.column.findMany({
-      where: {
-        ...(projectId && { projectId }),
-      },
+      where: projectId ? { projectId } : {},
       include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        project: { select: { id: true, name: true } },
         tasks: {
           include: {
-            assignedTo: {
-              select: {
-                id: true,
-                name: true,
-                initials: true,
-                avatar: true,
-              },
-            },
+            assignedTo: { select: { id: true, name: true, initials: true, avatar: true } },
           },
-          orderBy: {
-            createdAt: 'asc',
-          },
+          orderBy: { createdAt: 'asc' },
         },
-        _count: {
-          select: {
-            tasks: true,
-          },
-        },
+        _count: { select: { tasks: true } },
       },
-      orderBy: {
-        order: 'asc',
-      },
+      orderBy: { order: 'asc' },
     });
 
     sendSuccess(res, columns, 'Columns retrieved successfully');
-  } catch (error) {
-    throw error;
+  } catch (error: any) {
+    sendError(res, error.message || 'Failed to fetch columns', 500);
   }
 });
 
@@ -88,44 +66,22 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     const column = await prisma.column.findUnique({
       where: { id: columnId },
       include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        project: { select: { id: true, name: true } },
         tasks: {
           include: {
-            assignedTo: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                initials: true,
-                avatar: true,
-              },
-            },
-            project: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+            assignedTo: { select: { id: true, name: true, email: true, initials: true, avatar: true } },
+            project: { select: { id: true, name: true } },
           },
-          orderBy: {
-            createdAt: 'asc',
-          },
+          orderBy: { createdAt: 'asc' },
         },
       },
     });
 
-    if (!column) {
-      return sendError(res, 'Column not found', 404);
-    }
+    if (!column) return sendError(res, 'Column not found', 404);
 
     sendSuccess(res, column, 'Column retrieved successfully');
-  } catch (error) {
-    throw error;
+  } catch (error: any) {
+    sendError(res, error.message || 'Failed to fetch column', 500);
   }
 });
 
@@ -151,22 +107,17 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         order: validatedData.order ?? (maxOrder ? maxOrder.order + 1 : 0),
       },
       include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        project: { select: { id: true, name: true } },
         tasks: true,
       },
     });
 
     sendSuccess(res, column, 'Column created successfully', 201);
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
       return sendError(res, error.errors[0].message, 400);
     }
-    throw error;
+    sendError(res, error.message || 'Failed to create column', 500);
   }
 });
 
@@ -176,46 +127,22 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
     const columnId = req.params.id;
     const validatedData = updateColumnSchema.parse(req.body);
 
-    // Check if column exists
-    const existingColumn = await prisma.column.findUnique({
-      where: { id: columnId },
-    });
-
-    if (!existingColumn) {
-      return sendError(res, 'Column not found', 404);
-    }
+    const existingColumn = await prisma.column.findUnique({ where: { id: columnId } });
+    if (!existingColumn) return sendError(res, 'Column not found', 404);
 
     const column = await prisma.column.update({
       where: { id: columnId },
       data: validatedData,
       include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        tasks: {
-          include: {
-            assignedTo: {
-              select: {
-                id: true,
-                name: true,
-                initials: true,
-                avatar: true,
-              },
-            },
-          },
-        },
+        project: { select: { id: true, name: true } },
+        tasks: { include: { assignedTo: { select: { id: true, name: true, initials: true, avatar: true } } } },
       },
     });
 
     sendSuccess(res, column, 'Column updated successfully');
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return sendError(res, error.errors[0].message, 400);
-    }
-    throw error;
+  } catch (error: any) {
+    if (error instanceof z.ZodError) return sendError(res, error.errors[0].message, 400);
+    sendError(res, error.message || 'Failed to update column', 500);
   }
 });
 
@@ -224,43 +151,22 @@ router.patch('/reorder', async (req: AuthRequest, res: Response) => {
   try {
     const validatedData = reorderColumnsSchema.parse(req.body);
 
-    // Update all columns in a transaction
     await prisma.$transaction(
       validatedData.columns.map((col) =>
-        prisma.column.update({
-          where: { id: col.id },
-          data: { order: col.order },
-        })
+        prisma.column.update({ where: { id: col.id }, data: { order: col.order } })
       )
     );
 
-    // Fetch updated columns
     const columns = await prisma.column.findMany({
-      where: {
-        id: {
-          in: validatedData.columns.map((c) => c.id),
-        },
-      },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        tasks: true,
-      },
-      orderBy: {
-        order: 'asc',
-      },
+      where: { id: { in: validatedData.columns.map((c) => c.id) } },
+      include: { project: { select: { id: true, name: true } }, tasks: true },
+      orderBy: { order: 'asc' },
     });
 
     sendSuccess(res, columns, 'Columns reordered successfully');
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return sendError(res, error.errors[0].message, 400);
-    }
-    throw error;
+  } catch (error: any) {
+    if (error instanceof z.ZodError) return sendError(res, error.errors[0].message, 400);
+    sendError(res, error.message || 'Failed to reorder columns', 500);
   }
 });
 
@@ -269,32 +175,19 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const columnId = req.params.id;
 
-    // Check if column exists
-    const column = await prisma.column.findUnique({
-      where: { id: columnId },
-      include: {
-        tasks: true,
-      },
-    });
+    const column = await prisma.column.findUnique({ where: { id: columnId }, include: { tasks: true } });
+    if (!column) return sendError(res, 'Column not found', 404);
 
-    if (!column) {
-      return sendError(res, 'Column not found', 404);
-    }
-
-    // Prevent deletion if column has tasks
     if (column.tasks.length > 0) {
       return sendError(res, 'Cannot delete column with tasks. Please move or delete tasks first.', 400);
     }
 
-    await prisma.column.delete({
-      where: { id: columnId },
-    });
+    await prisma.column.delete({ where: { id: columnId } });
 
     sendSuccess(res, null, 'Column deleted successfully');
-  } catch (error) {
-    throw error;
+  } catch (error: any) {
+    sendError(res, error.message || 'Failed to delete column', 500);
   }
 });
 
 export default router;
-
