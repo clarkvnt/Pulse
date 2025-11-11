@@ -62,7 +62,11 @@ router.post('/register', async (req: Request, res: Response) => {
     });
 
     const payload = { userId: user.id, email: user.email, role: user.role };
-    const token = jwt.sign(payload, config.jwt.secret as string, { expiresIn: config.jwt.expire });
+    
+    // ⬇️ FIX APPLIED HERE: Pass expiresIn inside a SignOptions object 
+    const options: SignOptions = { expiresIn: config.jwt.expire };
+    const token = jwt.sign(payload, config.jwt.secret as string, options);
+    // ⬆️ FIX APPLIED HERE
 
     sendSuccess(res, { user, token }, 'User registered successfully', 201);
   } catch (error) {
@@ -86,7 +90,11 @@ router.post('/login', async (req: Request, res: Response) => {
     if (!isPasswordValid) return sendError(res, 'Invalid email or password', 401);
 
     const payload = { userId: user.id, email: user.email, role: user.role };
-    const token = jwt.sign(payload, config.jwt.secret as string, { expiresIn: config.jwt.expire });
+
+    // ⬇️ FIX APPLIED HERE: Pass expiresIn inside a SignOptions object
+    const options: SignOptions = { expiresIn: config.jwt.expire };
+    const token = jwt.sign(payload, config.jwt.secret as string, options);
+    // ⬆️ FIX APPLIED HERE
 
     const { password, ...userWithoutPassword } = user;
 
@@ -100,6 +108,8 @@ router.post('/login', async (req: Request, res: Response) => {
 // Get current user (protected)
 router.get('/me', async (_req: Request, res: Response) => {
   try {
+    // Note: If you defined a custom AuthRequest type elsewhere, you should use that here
+    // But for simplicity, we stick to Request and access headers.
     const authHeader = _req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer '))
@@ -111,7 +121,7 @@ router.get('/me', async (_req: Request, res: Response) => {
       const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
 
       const user = await prisma.user.findUnique({
-        where: { id: Number(decoded.userId) }, // ✅ convert to number
+        where: { id: Number(decoded.userId) }, 
         select: {
           id: true,
           name: true,
