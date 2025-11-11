@@ -5,7 +5,6 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import prisma from '../config/database.js';
 import { config } from '../config/env.js';
 import { sendSuccess, sendError } from '../utils/response.js';
-import { AppError } from '../middleware/errorHandler.js';
 
 const router = Router();
 
@@ -71,19 +70,11 @@ router.post('/register', async (req: Request, res: Response) => {
     // Generate JWT token
     const payload = { userId: user.id, email: user.email, role: user.role };
     const secret = config.jwt.secret as string;
-    const options: SignOptions = { expiresIn: config.jwt.expire };
+    const options: SignOptions = { expiresIn: config.jwt.expire as unknown as string | number };
 
     const token = jwt.sign(payload, secret, options);
 
-    sendSuccess(
-      res,
-      {
-        user,
-        token,
-      },
-      'User registered successfully',
-      201
-    );
+    sendSuccess(res, { user, token }, 'User registered successfully', 201);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return sendError(res, error.errors[0].message, 400);
@@ -116,21 +107,14 @@ router.post('/login', async (req: Request, res: Response) => {
     // Generate JWT token
     const payload = { userId: user.id, email: user.email, role: user.role };
     const secret = config.jwt.secret as string;
-    const options: SignOptions = { expiresIn: config.jwt.expire };
+    const options: SignOptions = { expiresIn: config.jwt.expire as unknown as string | number };
 
     const token = jwt.sign(payload, secret, options);
 
     // Return user without password
     const { password, ...userWithoutPassword } = user;
 
-    sendSuccess(
-      res,
-      {
-        user: userWithoutPassword,
-        token,
-      },
-      'Login successful'
-    );
+    sendSuccess(res, { user: userWithoutPassword, token }, 'Login successful');
   } catch (error) {
     if (error instanceof z.ZodError) {
       return sendError(res, error.errors[0].message, 400);
@@ -173,7 +157,7 @@ router.get('/me', async (_req: Request, res: Response) => {
       }
 
       sendSuccess(res, user, 'User retrieved successfully');
-    } catch (error) {
+    } catch (_err) {
       return sendError(res, 'Invalid or expired token', 401);
     }
   } catch (error) {
