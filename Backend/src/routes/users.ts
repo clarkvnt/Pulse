@@ -9,7 +9,7 @@ const router = Router();
 // Apply authentication to all routes
 router.use(authenticate);
 
-// Validation schemas
+// Validation schema for updating user
 const updateUserSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   role: z.enum(['admin', 'project_manager', 'team_member', 'viewer']).optional(),
@@ -17,13 +17,8 @@ const updateUserSchema = z.object({
   status: z.enum(['Active', 'Offline', 'Away']).optional(),
 });
 
-const updatePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(6, 'New password must be at least 6 characters'),
-});
-
 // Get all users
-router.get('/', async (req: AuthRequest, res: Response) => {
+router.get('/', async (_req: AuthRequest, res: Response) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -37,25 +32,21 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         createdAt: true,
         updatedAt: true,
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
 
     sendSuccess(res, users, 'Users retrieved successfully');
   } catch (error) {
-    throw error;
+    console.error(error);
+    sendError(res, 'Failed to retrieve users', 500);
   }
 });
 
 // Get user by ID
-router.get('/:id', async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (_req: AuthRequest, res: Response) => {
   try {
-    const userId = parseInt(req.params.id, 10);
-
-    if (isNaN(userId)) {
-      return sendError(res, 'Invalid user ID', 400);
-    }
+    const userId = parseInt(res.req.params.id, 10);
+    if (isNaN(userId)) return sendError(res, 'Invalid user ID', 400);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -72,13 +63,12 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       },
     });
 
-    if (!user) {
-      return sendError(res, 'User not found', 404);
-    }
+    if (!user) return sendError(res, 'User not found', 404);
 
     sendSuccess(res, user, 'User retrieved successfully');
   } catch (error) {
-    throw error;
+    console.error(error);
+    sendError(res, 'Failed to retrieve user', 500);
   }
 });
 
@@ -86,10 +76,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = parseInt(req.params.id, 10);
-
-    if (isNaN(userId)) {
-      return sendError(res, 'Invalid user ID', 400);
-    }
+    if (isNaN(userId)) return sendError(res, 'Invalid user ID', 400);
 
     // Only allow users to update themselves unless they're admin
     if (userId !== req.userId && req.userRole !== 'admin') {
@@ -101,13 +88,12 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
     // Update initials if name changed
     const updateData: any = { ...validatedData };
     if (validatedData.name) {
-      const initials = validatedData.name
+      updateData.initials = validatedData.name
         .split(' ')
         .map((n) => n[0])
         .join('')
         .toUpperCase()
         .slice(0, 2);
-      updateData.initials = initials;
     }
 
     const user = await prisma.user.update({
@@ -128,40 +114,30 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
 
     sendSuccess(res, user, 'User updated successfully');
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return sendError(res, error.errors[0].message, 400);
-    }
-    throw error;
+    if (error instanceof z.ZodError) return sendError(res, error.errors[0].message, 400);
+    console.error(error);
+    sendError(res, 'Failed to update user', 500);
   }
 });
 
 // Delete user (admin only)
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    if (req.userRole !== 'admin') {
-      return sendError(res, 'Forbidden: Only admins can delete users', 403);
-    }
+    if (req.userRole !== 'admin') return sendError(res, 'Forbidden: Only admins can delete users', 403);
 
     const userId = parseInt(req.params.id, 10);
-
-    if (isNaN(userId)) {
-      return sendError(res, 'Invalid user ID', 400);
-    }
+    if (isNaN(userId)) return sendError(res, 'Invalid user ID', 400);
 
     // Prevent self-deletion
-    if (userId === req.userId) {
-      return sendError(res, 'Cannot delete your own account', 400);
-    }
+    if (userId === req.userId) return sendError(res, 'Cannot delete your own account', 400);
 
-    await prisma.user.delete({
-      where: { id: userId },
-    });
+    await prisma.user.delete({ where: { id: userId } });
 
     sendSuccess(res, null, 'User deleted successfully');
   } catch (error) {
-    throw error;
+    console.error(error);
+    sendError(res, 'Failed to delete user', 500);
   }
 });
 
 export default router;
-

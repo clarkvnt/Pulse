@@ -8,7 +8,8 @@ export interface AuthRequest extends Request {
   userRole?: string;
 }
 
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
+// Authenticate middleware
+export const authenticate = (req: AuthRequest, _res: Response, next: NextFunction): void => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -31,8 +32,9 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 };
 
+// Role-based middleware
 export const requireRole = (...allowedRoles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+  return (req: AuthRequest, _res: Response, next: NextFunction): void => {
     if (!req.userRole) {
       return next(new AppError('Unauthorized', 401));
     }
@@ -44,4 +46,3 @@ export const requireRole = (...allowedRoles: string[]) => {
     next();
   };
 };
-

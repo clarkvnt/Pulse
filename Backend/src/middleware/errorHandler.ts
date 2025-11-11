@@ -2,11 +2,13 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
 
+// Interface for custom errors
 export interface ApiError extends Error {
   statusCode?: number;
   isOperational?: boolean;
 }
 
+// Custom AppError class
 export class AppError extends Error implements ApiError {
   statusCode: number;
   isOperational: boolean;
@@ -20,11 +22,12 @@ export class AppError extends Error implements ApiError {
   }
 }
 
+// Error handler middleware
 export const errorHandler = (
   err: ApiError | ZodError | Error,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void => {
   // Zod validation errors
   if (err instanceof ZodError) {
@@ -61,7 +64,8 @@ export const errorHandler = (
 
   // Custom AppError
   if ('isOperational' in err && err.isOperational) {
-    res.status(err.statusCode || 500).json({
+    const statusCode = (err as ApiError).statusCode || 500;
+    res.status(statusCode).json({
       success: false,
       error: err.message,
     });

@@ -35,7 +35,7 @@ const updateProjectSchema = z.object({
 });
 
 // Get all projects
-router.get('/', async (req: AuthRequest, res: Response) => {
+router.get('/', async (_req: AuthRequest, res: Response) => {
   try {
     const projects = await prisma.project.findMany({
       include: {
@@ -70,7 +70,10 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       where: { id: projectId },
       include: {
         owner: { select: { id: true, name: true, email: true, initials: true, avatar: true } },
-        tasks: { include: { assignedTo: { select: { id: true, name: true, email: true, initials: true, avatar: true } }, column: true }, orderBy: { createdAt: 'desc' } },
+        tasks: {
+          include: { assignedTo: { select: { id: true, name: true, email: true, initials: true, avatar: true } }, column: true },
+          orderBy: { createdAt: 'desc' },
+        },
         columns: { orderBy: { order: 'asc' } },
       },
     });
@@ -141,7 +144,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
     if (validatedData.dueDate === '') updateData.dueDate = null;
     else if (validatedData.dueDate) updateData.dueDate = new Date(validatedData.dueDate);
 
-    if (!validatedData.progress) {
+    if (validatedData.progress === undefined) {
       const tasks = await prisma.task.findMany({ where: { projectId } });
       const completedCount = tasks.filter((t) => t.completed).length;
       updateData.progress = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : existingProject.progress;

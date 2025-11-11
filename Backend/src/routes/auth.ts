@@ -22,7 +22,7 @@ const registerSchema = z.object({
 // Helper to sign JWT
 const signJWT = (payload: object | string) => {
   const secret = process.env.JWT_SECRET!;
-  const options: SignOptions = { expiresIn: '1h' }; // 'expiresIn' is valid with SignOptions
+  const options: SignOptions = { expiresIn: '1h' };
   return jwt.sign(payload, secret, options);
 };
 
@@ -56,7 +56,8 @@ router.post('/login', async (req, res: Response) => {
     const user = await prisma.user.findUnique({ where: { email: data.email } });
     if (!user) return sendError(res, 'Invalid credentials', 400);
 
-    const match = await bcrypt.compare(data.password, user.password);
+    // Assert user.password exists
+    const match = await bcrypt.compare(data.password, user.password!);
     if (!match) return sendError(res, 'Invalid credentials', 400);
 
     const token = signJWT({ id: user.id, email: user.email });
