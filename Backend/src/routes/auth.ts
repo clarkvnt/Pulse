@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import prisma from '../config/database.js';
 import { config } from '../config/env.js';
 import { sendSuccess, sendError } from '../utils/response.js';
@@ -69,11 +69,11 @@ router.post('/register', async (req: Request, res: Response) => {
     });
 
     // Generate JWT token
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
-      config.jwt.secret,
-      { expiresIn: config.jwt.expire }
-    );
+    const payload = { userId: user.id, email: user.email, role: user.role };
+    const secret = config.jwt.secret as string;
+    const options: SignOptions = { expiresIn: config.jwt.expire };
+
+    const token = jwt.sign(payload, secret, options);
 
     sendSuccess(
       res,
@@ -114,11 +114,11 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // Generate JWT token
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
-      config.jwt.secret,
-      { expiresIn: config.jwt.expire }
-    );
+    const payload = { userId: user.id, email: user.email, role: user.role };
+    const secret = config.jwt.secret as string;
+    const options: SignOptions = { expiresIn: config.jwt.expire };
+
+    const token = jwt.sign(payload, secret, options);
 
     // Return user without password
     const { password, ...userWithoutPassword } = user;
@@ -140,9 +140,9 @@ router.post('/login', async (req: Request, res: Response) => {
 });
 
 // Get current user (protected)
-router.get('/me', async (req: Request, res: Response) => {
+router.get('/me', async (_req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = _req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return sendError(res, 'No token provided', 401);
@@ -182,4 +182,3 @@ router.get('/me', async (req: Request, res: Response) => {
 });
 
 export default router;
-
