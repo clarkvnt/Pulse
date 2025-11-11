@@ -5,14 +5,14 @@ cd /opt/pulse
 
 echo "Installing backend dependencies..."
 cd Backend
-npm install
-npm run build
+sudo npm install
+sudo npm run build
 cd ..
 
 echo "Installing frontend dependencies..."
 cd Frontend
-npm install
-npm run build
+sudo npm install
+sudo npm run build
 cd ..
 
 echo "Dependencies installed and frontend built successfully."
