@@ -1,5 +1,7 @@
 # Pulse Backend API
 
+> Last updated: November 2025
+
 Backend API server for the Pulse project management tool, built with Express, TypeScript, and Prisma. **Ready for AWS deployment** with Docker support.
 
 ## Prerequisites
