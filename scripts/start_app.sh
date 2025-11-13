@@ -30,8 +30,41 @@ fi
 # ---------------------------
 echo "Starting backend..."
 cd $BACKEND_DIR
-npm install --silent
+
+# Ensure dependencies are installed
+if [ ! -d "node_modules" ]; then
+    echo "Installing backend dependencies..."
+    npm install --silent
+fi
+
+# Build backend if dist folder doesn't exist
+if [ ! -d "dist" ]; then
+    echo "Building backend..."
+    npm run build
+fi
+
+# Stop any existing backend process
+echo "Stopping any existing backend process..."
+pkill -f "node.*dist/server.js" || true
+sleep 2
+
+# Start backend in background
+echo "Starting backend server..."
 nohup npm start >> $BACKEND_LOG 2>&1 &
+BACKEND_PID=$!
+
+# Give backend a moment to start
+sleep 3
+
+# Verify backend process is running
+if ! kill -0 $BACKEND_PID 2>/dev/null; then
+    echo "ERROR: Backend process failed to start!"
+    echo "Backend log:"
+    tail -50 $BACKEND_LOG
+    exit 1
+fi
+
+echo "Backend started with PID: $BACKEND_PID"
 
 # ---------------------------
 # 3️⃣ Build and serve frontend
