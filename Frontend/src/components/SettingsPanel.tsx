@@ -1,3 +1,4 @@
+// Settings Panel Component
 import { useState, useEffect } from 'react';
 import { Shield, Palette, Database, Moon, Sun, User, FileDown, Download } from 'lucide-react';
 import { Button } from './ui/button';

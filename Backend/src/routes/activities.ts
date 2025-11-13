@@ -1,3 +1,4 @@
+// Activity Management Routes
 import { Router, Response } from 'express';
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/response.js';
