@@ -1,6 +1,8 @@
 
   # Project Management Tool
 
+  > Last updated: November 2025
+
   This is a code bundle for Project Management Tool. The original project is available at https://www.figma.com/design/sUEkTUr2qVBWcdBavegeqx/Project-Management-Tool.
 
   ## Running the code
