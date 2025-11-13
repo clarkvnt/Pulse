@@ -114,6 +114,21 @@ if [ ! -f ".env" ]; then
     fi
 fi
 
+# Update DATABASE_URL from environment variable if provided
+ENV_DATABASE_URL="${DATABASE_URL:-}"
+
+if [ -n "$ENV_DATABASE_URL" ]; then
+    echo "Updating DATABASE_URL from environment variable..."
+    TMP_ENV_FILE=$(mktemp)
+    awk -v value="$ENV_DATABASE_URL" '
+        BEGIN { updated = 0 }
+        /^DATABASE_URL=/ { print "DATABASE_URL=" value; updated = 1; next }
+        { print }
+        END { if (updated == 0) print "DATABASE_URL=" value }
+    ' .env > "$TMP_ENV_FILE"
+    mv "$TMP_ENV_FILE" .env
+fi
+
 # Configure FRONTEND_URLS if not already set
 if ! grep -q "FRONTEND_URLS" .env || grep -q "^FRONTEND_URLS=$" .env; then
     echo "Configuring FRONTEND_URLS..."
@@ -167,9 +182,13 @@ fi
 # ---------------------------
 echo "Ensuring database connectivity..."
 
-DATABASE_URL=$(grep -E '^DATABASE_URL=' .env | tail -n 1 | cut -d= -f2- | tr -d '\r')
-DATABASE_URL="${DATABASE_URL%\"}"
-DATABASE_URL="${DATABASE_URL#\"}"
+if [ -n "$ENV_DATABASE_URL" ]; then
+    DATABASE_URL="$ENV_DATABASE_URL"
+else
+    DATABASE_URL=$(grep -E '^DATABASE_URL=' .env | tail -n 1 | cut -d= -f2- | tr -d '\r')
+    DATABASE_URL="${DATABASE_URL%\"}"
+    DATABASE_URL="${DATABASE_URL#\"}"
+fi
 
 if [ -z "$DATABASE_URL" ]; then
     echo "ERROR: DATABASE_URL is not set in .env. Please configure it before deployment."
