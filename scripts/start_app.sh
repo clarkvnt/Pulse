@@ -114,11 +114,56 @@ if [ ! -f ".env" ]; then
     fi
 fi
 
-# Update DATABASE_URL from environment variable if provided
-ENV_DATABASE_URL="${DATABASE_URL:-}"
+# Update DATABASE_URL from environment variable/secret if provided
+ENV_DATABASE_URL=""
+
+# Check common environment variable names
+for var in DATABASE_URL PULSE_DATABASE_URL PRIMARY_DATABASE_URL; do
+    value="${!var:-}"
+    if [ -z "$ENV_DATABASE_URL" ] && [ -n "$value" ]; then
+        ENV_DATABASE_URL="$value"
+    fi
+done
+
+# Pull from AWS SSM Parameter Store if configured
+if [ -z "$ENV_DATABASE_URL" ] && [ -n "${DATABASE_URL_SSM_PARAMETER:-}" ]; then
+    if command -v aws >/dev/null 2>&1; then
+        echo "Fetching DATABASE_URL from SSM parameter ${DATABASE_URL_SSM_PARAMETER}..."
+        ENV_DATABASE_URL=$(aws ssm get-parameter --name "$DATABASE_URL_SSM_PARAMETER" --with-decryption --query 'Parameter.Value' --output text 2>/dev/null || true)
+        if [ -z "$ENV_DATABASE_URL" ] || [ "$ENV_DATABASE_URL" = "None" ]; then
+            echo "WARNING: Failed to retrieve DATABASE_URL from SSM parameter ${DATABASE_URL_SSM_PARAMETER}."
+            ENV_DATABASE_URL=""
+        fi
+    else
+        echo "WARNING: AWS CLI not available to fetch SSM parameter ${DATABASE_URL_SSM_PARAMETER}."
+    fi
+fi
+
+# Pull from AWS Secrets Manager if configured
+if [ -z "$ENV_DATABASE_URL" ] && [ -n "${DATABASE_URL_SECRET_ID:-}" ]; then
+    if command -v aws >/dev/null 2>&1; then
+        echo "Fetching DATABASE_URL from Secrets Manager secret ${DATABASE_URL_SECRET_ID}..."
+        ENV_DATABASE_URL=$(aws secretsmanager get-secret-value --secret-id "$DATABASE_URL_SECRET_ID" --query 'SecretString' --output text 2>/dev/null || true)
+        if [ -z "$ENV_DATABASE_URL" ] || [ "$ENV_DATABASE_URL" = "None" ]; then
+            echo "WARNING: Failed to retrieve DATABASE_URL from Secrets Manager secret ${DATABASE_URL_SECRET_ID}."
+            ENV_DATABASE_URL=""
+        fi
+    else
+        echo "WARNING: AWS CLI not available to fetch Secrets Manager secret ${DATABASE_URL_SECRET_ID}."
+    fi
+fi
+
+# Build DATABASE_URL from RDS-provided environment variables if available
+if [ -z "$ENV_DATABASE_URL" ] && [ -n "${RDS_HOSTNAME:-}" ] && [ -n "${RDS_USERNAME:-}" ] && [ -n "${RDS_PASSWORD:-}" ]; then
+    RDS_DB_NAME_VALUE="${RDS_DB_NAME:-pulse_db}"
+    RDS_PORT_VALUE="${RDS_PORT:-5432}"
+    echo "Constructing DATABASE_URL from RDS environment variables..."
+    RDS_PASSWORD_ESCAPED=$(node -e "console.log(encodeURIComponent(process.argv[1] || ''))" "$RDS_PASSWORD")
+    ENV_DATABASE_URL="postgresql://${RDS_USERNAME}:${RDS_PASSWORD_ESCAPED}@${RDS_HOSTNAME}:${RDS_PORT_VALUE}/${RDS_DB_NAME_VALUE}?schema=public"
+fi
 
 if [ -n "$ENV_DATABASE_URL" ]; then
-    echo "Updating DATABASE_URL from environment variable..."
+    echo "Updating DATABASE_URL in .env..."
     TMP_ENV_FILE=$(mktemp)
     awk -v value="$ENV_DATABASE_URL" '
         BEGIN { updated = 0 }
