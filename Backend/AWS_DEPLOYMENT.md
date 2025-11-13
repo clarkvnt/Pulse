@@ -116,6 +116,10 @@ Create `task-definition.json`:
         {
           "name": "FRONTEND_URL",
           "value": "https://your-frontend-domain.com"
+        },
+        {
+          "name": "FRONTEND_URLS",
+          "value": "http://16.176.29.160,https://your-frontend-domain.com"
         }
       ],
       "secrets": [
@@ -176,7 +180,8 @@ aws ecs create-service \
 | `PORT` | Server port | `5000` |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db?connection_limit=10` |
 | `JWT_SECRET` | JWT signing secret | Generate a secure random string |
-| `FRONTEND_URL` | Frontend domain for CORS | `https://app.pulse.com` |
+| `FRONTEND_URL` | Primary frontend domain for CORS | `https://app.pulse.com` |
+| `FRONTEND_URLS` | Additional frontend URLs (comma-separated) for CORS | `http://16.176.29.160,https://app.pulse.com` |
 
 ### Optional Variables
 
