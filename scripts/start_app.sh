@@ -26,10 +26,78 @@ if [ ! -d "$NGINX_TARGET" ]; then
 fi
 
 # ---------------------------
-# 2️⃣ Start backend
+# 2️⃣ Configure environment variables
+# ---------------------------
+echo "Configuring backend environment..."
+
+# Get the server's public IP address
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "")
+LOCAL_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4 2>/dev/null || hostname -I | awk '{print $1}')
+
+cd $BACKEND_DIR
+
+# Create .env file if it doesn't exist
+if [ ! -f ".env" ]; then
+    echo "Creating .env file from template..."
+    if [ -f "env.template" ]; then
+        cp env.template .env
+    else
+        touch .env
+    fi
+fi
+
+# Configure FRONTEND_URLS if not already set
+if ! grep -q "FRONTEND_URLS" .env || grep -q "^FRONTEND_URLS=$" .env; then
+    echo "Configuring FRONTEND_URLS..."
+    
+    # Build the frontend URLs list
+    FRONTEND_URLS=""
+    
+    if [ -n "$PUBLIC_IP" ]; then
+        FRONTEND_URLS="http://${PUBLIC_IP}"
+    fi
+    
+    if [ -n "$LOCAL_IP" ] && [ "$LOCAL_IP" != "$PUBLIC_IP" ]; then
+        if [ -n "$FRONTEND_URLS" ]; then
+            FRONTEND_URLS="${FRONTEND_URLS},http://${LOCAL_IP}"
+        else
+            FRONTEND_URLS="http://${LOCAL_IP}"
+        fi
+    fi
+    
+    # Update or add FRONTEND_URLS in .env
+    if grep -q "^FRONTEND_URLS=" .env; then
+        sed -i "s|^FRONTEND_URLS=.*|FRONTEND_URLS=${FRONTEND_URLS}|" .env
+    else
+        echo "FRONTEND_URLS=${FRONTEND_URLS}" >> .env
+    fi
+    
+    echo "Set FRONTEND_URLS=${FRONTEND_URLS}"
+fi
+
+# Ensure FRONTEND_URL is set if not already
+if ! grep -q "^FRONTEND_URL=" .env || grep -q "^FRONTEND_URL=$" .env; then
+    if [ -n "$PUBLIC_IP" ]; then
+        if grep -q "^FRONTEND_URL=" .env; then
+            sed -i "s|^FRONTEND_URL=.*|FRONTEND_URL=http://${PUBLIC_IP}|" .env
+        else
+            echo "FRONTEND_URL=http://${PUBLIC_IP}" >> .env
+        fi
+        echo "Set FRONTEND_URL=http://${PUBLIC_IP}"
+    fi
+fi
+
+# Ensure NODE_ENV is set to production
+if ! grep -q "^NODE_ENV=" .env; then
+    echo "NODE_ENV=production" >> .env
+elif ! grep -q "^NODE_ENV=production" .env; then
+    sed -i "s|^NODE_ENV=.*|NODE_ENV=production|" .env
+fi
+
+# ---------------------------
+# 3️⃣ Start backend
 # ---------------------------
 echo "Starting backend..."
-cd $BACKEND_DIR
 
 # Ensure dependencies are installed
 if [ ! -d "node_modules" ]; then
@@ -67,7 +135,7 @@ fi
 echo "Backend started with PID: $BACKEND_PID"
 
 # ---------------------------
-# 3️⃣ Build and serve frontend
+# 4️⃣ Build and serve frontend
 # ---------------------------
 echo "Serving frontend via Nginx..."
 
