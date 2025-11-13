@@ -12,6 +12,74 @@ FRONTEND_BUILD="$FRONTEND_DIR/build"    # frontend output folder
 NGINX_TARGET="/usr/share/nginx/html"
 
 # ---------------------------
+# Helper functions
+# ---------------------------
+wait_for_database() {
+    local host="$1"
+    local port="$2"
+    local retries="${3:-30}"
+    local delay="${4:-2}"
+
+    for ((attempt=1; attempt<=retries; attempt++)); do
+        if node - "$host" "$port" <<'NODE' > /dev/null 2>&1; then
+const net = require('net');
+const host = process.argv[2];
+const port = Number(process.argv[3]);
+const socket = net.connect({ host, port, timeout: 2000 });
+socket.once('connect', () => {
+  socket.end();
+  process.exit(0);
+});
+socket.once('timeout', () => {
+  socket.destroy();
+  process.exit(1);
+});
+socket.once('error', () => {
+  process.exit(1);
+});
+setTimeout(() => {}, 4000);
+NODE
+        then
+            echo "Database reachable at ${host}:${port}"
+            return 0
+        fi
+
+        echo "Waiting for database ${host}:${port}... (attempt ${attempt}/${retries})"
+        sleep "$delay"
+    done
+
+    return 1
+}
+
+start_local_postgres() {
+    local compose_cmd=""
+
+    if command -v docker >/dev/null 2>&1; then
+        if docker compose version >/dev/null 2>&1; then
+            compose_cmd="docker compose"
+        fi
+    fi
+
+    if [ -z "$compose_cmd" ] && command -v docker-compose >/dev/null 2>&1; then
+        compose_cmd="docker-compose"
+    fi
+
+    if [ -z "$compose_cmd" ]; then
+        echo "Docker Compose is not available; cannot auto-start local PostgreSQL."
+        return 1
+    fi
+
+    echo "Attempting to start PostgreSQL using ${compose_cmd}..."
+    if (cd "$BACKEND_DIR" && $compose_cmd up -d postgres); then
+        echo "PostgreSQL container started (or already running)."
+        return 0
+    fi
+
+    echo "Failed to start PostgreSQL via Docker Compose."
+    return 1
+}
+
+# ---------------------------
 # 1️⃣ Ensure directories and log file exist
 # ---------------------------
 sudo mkdir -p $PULSE_DIR
@@ -95,7 +163,67 @@ elif ! grep -q "^NODE_ENV=production" .env; then
 fi
 
 # ---------------------------
-# 3️⃣ Start backend
+# 3️⃣ Ensure database is ready
+# ---------------------------
+echo "Ensuring database connectivity..."
+
+DATABASE_URL=$(grep -E '^DATABASE_URL=' .env | tail -n 1 | cut -d= -f2- | tr -d '\r')
+DATABASE_URL="${DATABASE_URL%\"}"
+DATABASE_URL="${DATABASE_URL#\"}"
+
+if [ -z "$DATABASE_URL" ]; then
+    echo "ERROR: DATABASE_URL is not set in .env. Please configure it before deployment."
+    exit 1
+fi
+
+DB_PARSE=$(node - "$DATABASE_URL" <<'NODE'
+try {
+  const url = new URL(process.argv[2]);
+  const host = url.hostname || 'localhost';
+  const port = url.port || '5432';
+  process.stdout.write(`${host}:${port}`);
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+NODE
+)
+
+if [ $? -ne 0 ] || [ -z "$DB_PARSE" ]; then
+    echo "ERROR: Unable to parse DATABASE_URL. Value: ${DATABASE_URL}"
+    exit 1
+fi
+
+DB_HOST=${DB_PARSE%:*}
+DB_PORT=${DB_PARSE#*:}
+
+if ! wait_for_database "$DB_HOST" "$DB_PORT" 10 3; then
+    if [[ "$DB_HOST" =~ ^(localhost|127\.0\.0\.1|::1)$ ]]; then
+        echo "Database not reachable at ${DB_HOST}:${DB_PORT}. Attempting to start local PostgreSQL..."
+        if start_local_postgres; then
+            echo "Waiting for local PostgreSQL to become ready..."
+            if ! wait_for_database "$DB_HOST" "$DB_PORT" 20 3; then
+                echo "ERROR: PostgreSQL did not become ready at ${DB_HOST}:${DB_PORT}."
+                exit 1
+            fi
+        else
+            echo "ERROR: Unable to start local PostgreSQL automatically."
+            exit 1
+        fi
+    else
+        echo "ERROR: Unable to reach database at ${DB_HOST}:${DB_PORT}. Please verify connectivity and credentials."
+        exit 1
+    fi
+fi
+
+echo "Running Prisma migrations..."
+if ! npm run prisma:migrate:deploy; then
+    echo "ERROR: Prisma migrations failed. Check the output above for details."
+    exit 1
+fi
+
+# ---------------------------
+# 4️⃣ Start backend
 # ---------------------------
 echo "Starting backend..."
 
@@ -135,7 +263,7 @@ fi
 echo "Backend started with PID: $BACKEND_PID"
 
 # ---------------------------
-# 4️⃣ Build and serve frontend
+# 5️⃣ Build and serve frontend
 # ---------------------------
 echo "Serving frontend via Nginx..."
 

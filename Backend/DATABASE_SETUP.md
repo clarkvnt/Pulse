@@ -140,3 +140,14 @@ Once database is connected:
 2. The 500 error should be gone
 3. You can create your account and start using the app!
 
+---
+
+## Deployment Scripts & Automatic Checks
+
+When deploying with the provided AWS CodeDeploy scripts:
+
+- `scripts/start_app.sh` now waits for the database endpoint defined in `.env` to become reachable before the backend starts.
+- If the URL points to `localhost` and Docker (with Compose) is available on the instance, the script will attempt to launch the bundled PostgreSQL container automatically (`docker compose up -d postgres`).
+- If you are using an external database (RDS, Supabase, etc.), make sure `DATABASE_URL` points to that host and that network/security groups allow the EC2 instance to connect.
+- The deployment will fail fast with a clear message if the database cannot be reached, preventing half-started services.
+
