@@ -79,6 +79,25 @@ start_local_postgres() {
     return 1
 }
 
+start_system_postgres() {
+    local services=("postgresql" "postgresql-15" "postgresql-14" "postgresql-13" "postgresql-12" "postgresql-11")
+
+    for svc in "${services[@]}"; do
+        if systemctl list-unit-files | grep -q "^${svc}\.service"; then
+            echo "Attempting to start PostgreSQL using systemd service ${svc}.service..."
+            if sudo systemctl start "${svc}.service"; then
+                echo "PostgreSQL service ${svc}.service started (or already running)."
+                return 0
+            else
+                echo "Failed to start ${svc}.service."
+            fi
+        fi
+    done
+
+    echo "No PostgreSQL systemd service could be started automatically."
+    return 1
+}
+
 # ---------------------------
 # 1️⃣ Ensure directories and log file exist
 # ---------------------------
@@ -264,10 +283,17 @@ DB_PORT=${DB_PARSE#*:}
 if ! wait_for_database "$DB_HOST" "$DB_PORT" 10 3; then
     if [[ "$DB_HOST" =~ ^(localhost|127\.0\.0\.1|::1)$ ]]; then
         echo "Database not reachable at ${DB_HOST}:${DB_PORT}. Attempting to start local PostgreSQL..."
-        if start_local_postgres; then
-            echo "Waiting for local PostgreSQL to become ready..."
+
+        if start_system_postgres; then
+            echo "Waiting for system PostgreSQL service to become ready..."
             if ! wait_for_database "$DB_HOST" "$DB_PORT" 20 3; then
-                echo "ERROR: PostgreSQL did not become ready at ${DB_HOST}:${DB_PORT}."
+                echo "ERROR: PostgreSQL service did not become ready at ${DB_HOST}:${DB_PORT}."
+                exit 1
+            fi
+        elif start_local_postgres; then
+            echo "Waiting for Docker-based PostgreSQL to become ready..."
+            if ! wait_for_database "$DB_HOST" "$DB_PORT" 20 3; then
+                echo "ERROR: PostgreSQL (Docker) did not become ready at ${DB_HOST}:${DB_PORT}."
                 exit 1
             fi
         else
