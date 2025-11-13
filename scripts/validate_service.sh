@@ -12,7 +12,11 @@ echo "Validating backend service..."
 # Wait for backend process to be running
 echo "Checking if backend process is running..."
 for i in $(seq 1 $MAX_RETRIES); do
-  if pgrep -f "node.*server.js" > /dev/null || pgrep -f "npm start" > /dev/null; then
+  # Check for node process running server.js or dist/server.js
+  if pgrep -f "node.*dist/server.js" > /dev/null || \
+     pgrep -f "node.*server.js" > /dev/null || \
+     pgrep -f "npm.*start" > /dev/null || \
+     lsof -i :5000 > /dev/null 2>&1; then
     echo "Backend process found!"
     break
   fi
