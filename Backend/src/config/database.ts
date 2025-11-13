@@ -1,3 +1,4 @@
+// Database Configuration
 import { PrismaClient } from '@prisma/client';
 import { config } from './env.js';
 

@@ -1,6 +1,7 @@
 /**
  * API Client for Pulse Backend
  * Handles all HTTP requests to the backend API
+ * Updated: November 2025
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';

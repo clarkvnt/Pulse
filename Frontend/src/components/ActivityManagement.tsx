@@ -1,3 +1,4 @@
+// Activity Management Component
 import { CheckCircle2, MessageSquare, UserPlus, FileText, Filter, Plus, Edit, Trash2, FolderKanban } from 'lucide-react';
 import { Button } from './ui/button';
 import {
