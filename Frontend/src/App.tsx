@@ -1,3 +1,4 @@
+// Pulse Frontend Application
 import { useState, useEffect } from 'react';
 import { Toaster } from 'sonner';
 import { AuthGuard } from './components/AuthGuard';

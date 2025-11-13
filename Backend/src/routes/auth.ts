@@ -1,3 +1,4 @@
+// Authentication Routes
 import { Router, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';

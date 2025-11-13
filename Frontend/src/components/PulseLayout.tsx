@@ -1,3 +1,4 @@
+// Pulse Layout Component
 import React, { useState, useEffect } from 'react';
 import { Zap, Users, FolderKanban, Activity, Settings, LogOut } from 'lucide-react';
 import { Button } from './ui/button';

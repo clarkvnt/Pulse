@@ -1,3 +1,4 @@
+// CORS Middleware Configuration
 import cors from 'cors';
 import { config } from '../config/env.js';
 
