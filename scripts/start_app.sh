@@ -21,8 +21,7 @@ wait_for_database() {
     local delay="${4:-2}"
 
     for ((attempt=1; attempt<=retries; attempt++)); do
-        if node - "$host" "$port" >/dev/null 2>&1 <<'NODE'
-        then
+        if node - "$host" "$port" <<'NODE' >/dev/null 2>&1
 const net = require('net');
 const host = process.argv[2];
 const port = Number(process.argv[3]);
@@ -40,6 +39,7 @@ socket.once('error', () => {
 });
 setTimeout(() => {}, 4000);
 NODE
+        then
             echo "Database reachable at ${host}:${port}"
             return 0
         fi
